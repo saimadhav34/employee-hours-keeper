@@ -19,17 +19,33 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { timeEntryService, TimeEntry } from "../services/timeEntryService";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-interface TimeEntryFormData {
-  project: string;
-  category: string;
-  date: string;
-  startTime: string;
-  endTime: string;
-  description: string;
-}
+interface TimeEntryFormData extends Omit<TimeEntry, 'id' | 'employeeName'> {}
 
 export const TimeEntryForm = () => {
+  const queryClient = useQueryClient();
+  
+  const createTimeEntryMutation = useMutation({
+    mutationFn: (data: TimeEntryFormData) => {
+      const timeEntry: TimeEntry = {
+        ...data,
+        employeeName: "John Doe", // This should come from auth context in the future
+      };
+      return timeEntryService.createTimeEntry(timeEntry);
+    },
+    onSuccess: () => {
+      toast.success("Time entry saved successfully");
+      queryClient.invalidateQueries({ queryKey: ['timeEntries'] });
+      form.reset();
+    },
+    onError: (error) => {
+      toast.error("Failed to save time entry");
+      console.error("Error saving time entry:", error);
+    },
+  });
+
   const form = useForm<TimeEntryFormData>({
     defaultValues: {
       project: "",
@@ -57,10 +73,7 @@ export const TimeEntryForm = () => {
       return;
     }
 
-    // TODO: Save the time entry
-    console.log(data);
-    toast.success("Time entry saved successfully");
-    form.reset();
+    createTimeEntryMutation.mutate(data);
   };
 
   return (
@@ -183,8 +196,12 @@ export const TimeEntryForm = () => {
           )}
         />
 
-        <Button type="submit" className="w-full">
-          Save Time Entry
+        <Button 
+          type="submit" 
+          className="w-full"
+          disabled={createTimeEntryMutation.isPending}
+        >
+          {createTimeEntryMutation.isPending ? 'Saving...' : 'Save Time Entry'}
         </Button>
       </form>
     </Form>
